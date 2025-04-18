@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Main project dependencies
+  - package-ecosystem: "gradle"
+    directory: "/" # root project
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+
+  # buildSrc dependencies
+  - package-ecosystem: "gradle"
+    directory: "/buildSrc"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    ignore:
+      - dependency-name: "org.jetbrains.kotlin:kotlin-gradle-plugin"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
