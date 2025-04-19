@@ -3,8 +3,8 @@ plugins {
 }
 
 dependencies {
-    implementation 'com.github.javaparser:javaparser-core:3.26.3'
-    implementation 'com.github.javaparser:javaparser-symbol-solver-core:3.26.3'
+    implementation libs.javaparser.core
+    implementation libs.javaparser.symbol.solver.core
 
-    implementation 'org.neo4j.driver:neo4j-java-driver:5.26.0'
+    implementation libs.neo4j.java.driver
 }
