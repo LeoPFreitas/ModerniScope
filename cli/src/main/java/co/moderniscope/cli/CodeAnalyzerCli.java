@@ -38,11 +38,11 @@ public class CodeAnalyzerCli implements Callable<Integer> {
     @Option(names = {"-n", "--neo4j"}, description = "Export to Neo4j")
     private boolean exportToNeo4j;
 
-    @Option(names = {"--uri"}, description = "Neo4j URI (default: ${DEFAULT-VALUE})")
-    private String neo4jUri = "neo4j://localhost:7687";
+    @Option(names = {"--uri"}, description = "Neo4j URI (default: ${DEFAULT-VALUE})", defaultValue = "neo4j://localhost:7687")
+    private String neo4jUri;
 
-    @Option(names = {"--username"}, description = "Neo4j username (default: ${DEFAULT-VALUE})")
-    private String neo4jUsername = "neo4j";
+    @Option(names = {"--username"}, description = "Neo4j username (default: ${DEFAULT-VALUE})", defaultValue = "neo4j")
+    private String neo4jUsername;
 
     @Option(names = {"--password"}, description = "Neo4j password", interactive = true)
     private String neo4jPassword;
