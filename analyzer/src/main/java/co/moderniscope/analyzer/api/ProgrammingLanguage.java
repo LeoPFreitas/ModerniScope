@@ -13,5 +13,4 @@ public enum ProgrammingLanguage {
     GO,
     RUST,
     CPP,
-    // Add more languages as needed
 }

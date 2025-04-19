@@ -1,10 +1,11 @@
 package co.moderniscope.analyzer;
 
-
 import co.moderniscope.analyzer.api.AnalyzerFactory;
 import co.moderniscope.analyzer.api.CodeAnalyzer;
 import co.moderniscope.analyzer.api.DependencyGraph;
 import co.moderniscope.analyzer.impl.DefaultAnalyzerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -15,10 +16,11 @@ import java.util.Scanner;
  * Main application entry point for the code analyzer.
  */
 public class CodeAnalyzerApp {
+    private static final Logger logger = LoggerFactory.getLogger(CodeAnalyzerApp.class);
 
     public static void main(String[] args) {
-        System.out.println("Code Analyzer for Modernization Risk Assessment");
-        System.out.println("==============================================");
+        logger.info("Code Analyzer for Modernization Risk Assessment");
+        logger.info("==============================================");
 
         String projectPath;
         if (args.length > 0) {
@@ -36,6 +38,7 @@ public class CodeAnalyzerApp {
 
             // Analyze the project
             Path projectRoot = Paths.get(projectPath);
+            logger.info("Starting analysis of project at: {}", projectRoot.toAbsolutePath());
             analyzer.analyzeProject(projectRoot);
 
             // Export the graph
@@ -44,10 +47,10 @@ public class CodeAnalyzerApp {
             Path jsonOutputPath = Paths.get("dependency-graph.json");
 
             graph.exportToDot(dotOutputPath);
-            System.out.println("Graph exported to DOT format at: " + dotOutputPath);
+            logger.info("Graph exported to DOT format at: {}", dotOutputPath);
 
             graph.exportToJson(jsonOutputPath);
-            System.out.println("Graph exported to JSON format at: " + jsonOutputPath);
+            logger.info("Graph exported to JSON format at: {}", jsonOutputPath);
 
             // Ask if user wants to export to Neo4j
             System.out.println("\nDo you want to export the graph to Neo4j? (y/n)");
@@ -68,20 +71,18 @@ public class CodeAnalyzerApp {
 
                 // Use Neo4j exporter
                 try (Neo4jDependencyExporter neo4jExporter = new Neo4jDependencyExporter(uri, username, password)) {
-                    System.out.println("Exporting to Neo4j...");
+                    logger.info("Exporting to Neo4j at {}", uri);
                     neo4jExporter.exportGraph(graph);
-                    System.out.println("Graph successfully exported to Neo4j!");
+                    logger.info("Graph successfully exported to Neo4j!");
                 } catch (Exception e) {
-                    System.err.println("Error exporting to Neo4j: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Error exporting to Neo4j: {}", e.getMessage(), e);
                 }
             }
 
-            System.out.println("\nAnalysis complete!");
+            logger.info("Analysis complete!");
 
         } catch (IOException e) {
-            System.err.println("Error during analysis: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error during analysis: {}", e.getMessage(), e);
         }
     }
 }

@@ -11,6 +11,7 @@ import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.nodeTypes.NodeWithName;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
@@ -18,16 +19,18 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 
 /**
  * Java language analyzer implementation.
  */
 public class JavaAnalyzer implements LanguageAnalyzer {
+    private static final Logger logger = LoggerFactory.getLogger(JavaAnalyzer.class);
     private final CombinedTypeSolver typeSolver;
 
     public JavaAnalyzer() {
@@ -45,7 +48,7 @@ public class JavaAnalyzer implements LanguageAnalyzer {
 
     @Override
     public List<String> getSupportedFileExtensions() {
-        return Arrays.asList(".java");
+        return List.of(".java");
     }
 
     @Override
@@ -53,17 +56,17 @@ public class JavaAnalyzer implements LanguageAnalyzer {
         try {
             typeSolver.add(new JavaParserTypeSolver(sourceDir));
         } catch (Exception e) {
-            System.err.println("Error adding source directory to type solver: " + e.getMessage());
+            logger.error("Error adding source directory to type solver: {}", e.getMessage());
         }
     }
 
     @Override
     public boolean analyzeFile(Path file, DependencyGraph graph) {
         try {
-            System.out.println("Analyzing Java file: " + file);
+            logger.info("Analyzing Java file: {}", file);
 
             CompilationUnit cu = StaticJavaParser.parse(file);
-            String packageName = cu.getPackageDeclaration().map(pd -> pd.getNameAsString()).orElse("");
+            String packageName = cu.getPackageDeclaration().map(NodeWithName::getNameAsString).orElse("");
 
             // Import dependencies
             cu.findAll(com.github.javaparser.ast.ImportDeclaration.class).forEach(importDecl -> {
@@ -89,6 +92,7 @@ public class JavaAnalyzer implements LanguageAnalyzer {
                             // Resolution might fail for external types
                             String rawName = extendedType.getNameAsString();
                             graph.addDependency(className, rawName, RelationshipTypes.EXTENDS);
+                            logger.debug("Could not resolve extended type {}: {}", rawName, e.getMessage());
                         }
                     }
                 }
@@ -104,6 +108,7 @@ public class JavaAnalyzer implements LanguageAnalyzer {
                         } catch (Exception e) {
                             String rawName = implementedType.getNameAsString();
                             graph.addDependency(className, rawName, RelationshipTypes.IMPLEMENTS);
+                            logger.debug("Could not resolve implemented type {}: {}", rawName, e.getMessage());
                         }
                     }
                 }
@@ -120,6 +125,7 @@ public class JavaAnalyzer implements LanguageAnalyzer {
                             String rawTypeName = variable.getType().asString();
                             if (!rawTypeName.equals("var") && !isPrimitive(rawTypeName)) {
                                 graph.addDependency(className, rawTypeName, RelationshipTypes.HAS_FIELD);
+                                logger.debug("Could not resolve field type {}: {}", rawTypeName, e.getMessage());
                             }
                         }
                     }
@@ -132,7 +138,8 @@ public class JavaAnalyzer implements LanguageAnalyzer {
                         String targetClass = resolvedMethod.declaringType().getQualifiedName();
                         graph.addDependency(className, targetClass, RelationshipTypes.CALLS_METHOD);
                     } catch (Exception e) {
-                        // Skip if resolution fails
+                        logger.debug("Could not resolve method call {}: {}",
+                                methodCall.getNameAsString(), e.getMessage());
                     }
                 });
 
@@ -146,13 +153,15 @@ public class JavaAnalyzer implements LanguageAnalyzer {
                     } catch (Exception e) {
                         String rawTypeName = newExpr.getType().getNameAsString();
                         graph.addDependency(className, rawTypeName, RelationshipTypes.INSTANTIATES);
+                        logger.debug("Could not resolve instantiated type {}: {}",
+                                rawTypeName, e.getMessage());
                     }
                 });
             });
 
             return true;
         } catch (IOException e) {
-            System.err.println("Error analyzing file " + file + ": " + e.getMessage());
+            logger.error("Error analyzing file {}: {}", file, e.getMessage());
             return false;
         }
     }

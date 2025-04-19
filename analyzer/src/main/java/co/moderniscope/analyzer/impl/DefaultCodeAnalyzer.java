@@ -3,6 +3,8 @@ package co.moderniscope.analyzer.impl;
 import co.moderniscope.analyzer.api.CodeAnalyzer;
 import co.moderniscope.analyzer.api.DependencyGraph;
 import co.moderniscope.analyzer.api.LanguageAnalyzer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +16,8 @@ import java.util.stream.Stream;
  * Default implementation of CodeAnalyzer that supports multiple programming languages.
  */
 public class DefaultCodeAnalyzer implements CodeAnalyzer {
+    private static final Logger logger = LoggerFactory.getLogger(DefaultCodeAnalyzer.class);
+
     private final DependencyGraph graph;
     private final Map<String, LanguageAnalyzer> languageAnalyzers;
 
@@ -39,7 +43,6 @@ public class DefaultCodeAnalyzer implements CodeAnalyzer {
             throw new IllegalArgumentException("Not a directory: " + sourceDir);
         }
 
-        // Add source directory to all language analyzers
         for (LanguageAnalyzer analyzer : new HashSet<>(languageAnalyzers.values())) {
             analyzer.addSourceDirectory(sourceDir);
         }
@@ -51,7 +54,7 @@ public class DefaultCodeAnalyzer implements CodeAnalyzer {
             throw new IllegalArgumentException("Not a directory: " + projectRoot);
         }
 
-        System.out.println("Analyzing project at: " + projectRoot.toAbsolutePath());
+        logger.info("Analyzing project at: {}", projectRoot.toAbsolutePath());
 
         // Find source directories and add them to analyzers
         findSourceDirectories(projectRoot).forEach(this::addSourceDirectory);
@@ -63,7 +66,7 @@ public class DefaultCodeAnalyzer implements CodeAnalyzer {
                     .filter(this::isSupportedFile)
                     .toList();
 
-            System.out.println("Found " + sourceFiles.size() + " source files to analyze.");
+            logger.info("Found {} source files to analyze.", sourceFiles.size());
 
             int successCount = 0;
             for (Path file : sourceFiles) {
@@ -77,15 +80,15 @@ public class DefaultCodeAnalyzer implements CodeAnalyzer {
                             successCount++;
                         }
                     } catch (Exception e) {
-                        System.err.println("Error analyzing file " + file + ": " + e.getMessage());
+                        logger.error("Error analyzing file {}: {}", file, e.getMessage(), e);
                     }
                 }
             }
 
-            System.out.println("Successfully analyzed " + successCount + " out of " + sourceFiles.size() + " files.");
+            logger.info("Successfully analyzed {} out of {} files.", successCount, sourceFiles.size());
 
         } catch (IOException e) {
-            System.err.println("Error walking project directory: " + e.getMessage());
+            logger.error("Error walking project directory", e);
         }
     }
 
@@ -112,7 +115,7 @@ public class DefaultCodeAnalyzer implements CodeAnalyzer {
                     .filter(this::isPotentialSourceDir)
                     .forEach(sourceDirs::add);
         } catch (IOException e) {
-            System.err.println("Error finding source directories: " + e.getMessage());
+            logger.error("Error finding source directories", e);
         }
         return sourceDirs;
     }

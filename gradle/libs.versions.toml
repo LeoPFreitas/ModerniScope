@@ -3,6 +3,7 @@ junit = "5.12.2"
 junit-platform = "1.12.2"
 javaparser = "3.26.4"
 neo4j = "5.28.4"
+slf4j = "2.0.17"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
@@ -10,3 +11,5 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 javaparser-core = { module = "com.github.javaparser:javaparser-core", version.ref = "javaparser" }
 javaparser-symbol-solver-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "javaparser" }
 neo4j-java-driver = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }

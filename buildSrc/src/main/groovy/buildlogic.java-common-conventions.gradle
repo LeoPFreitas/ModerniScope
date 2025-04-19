@@ -12,6 +12,8 @@ repositories {
 dependencies {
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher
+
+    implementation libs.slf4j.api
 }
 
 java {
