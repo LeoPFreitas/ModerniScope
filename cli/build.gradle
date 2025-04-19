@@ -1,0 +1,19 @@
+plugins {
+    id 'buildlogic.java-application-conventions'
+
+    alias(libs.plugins.shadow)
+}
+
+dependencies {
+    implementation libs.picocli
+    annotationProcessor libs.picocli.codegen
+
+    implementation project(":analyzer")
+
+    implementation libs.log4j.slf4j2.impl
+    implementation libs.log4j.core
+}
+
+application {
+    mainClass = 'co.moderniscope.cli.CodeAnalyzerCli'
+}

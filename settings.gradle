@@ -6,3 +6,4 @@ rootProject.name = 'ModerniScope'
 
 
 include 'analyzer'
+include 'cli'

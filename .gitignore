@@ -101,3 +101,4 @@ Temporary Items
 
 # Ignore Gradle build output directory
 build
+/tmp-test/
