@@ -1,7 +1,7 @@
 [versions]
 junit = "5.12.2"
 junit-platform = "1.12.2"
-javaparser = "3.26.3"
+javaparser = "3.26.4"
 neo4j = "5.28.4"
 
 [libraries]
