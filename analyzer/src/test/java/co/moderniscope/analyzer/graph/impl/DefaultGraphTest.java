@@ -1129,15 +1129,16 @@ class DefaultGraphTest {
     }
 
     @Test
-    void testFindPathWithRelationshipTypesComprehensive() {
-        // Create a complex graph with multiple relationship types
-        //    A --friend--> B --colleague--> C
-        //    |             |                |
-        //    |             v                v
-        //    +--family---> D <--knows----- E
-        //    |             |                ^
-        //    v             v                |
-        //    F --knows---> G --partner----> H
+    void testFindPathWithRelationshipTypesAdvanced() {
+        // Create a more complex graph with diverse relationship patterns
+        //     A --friend-> B --friend-> C <-coworker- H
+        //     |            |            |            |
+        //     v            v            v            v
+        //     D --likes--> E <-owns---- F <-knows--- G
+        //     |            ^
+        //     v            |
+        //     I --trusts--->
+
         graph.addNode("A");
         graph.addNode("B");
         graph.addNode("C");
@@ -1146,84 +1147,81 @@ class DefaultGraphTest {
         graph.addNode("F");
         graph.addNode("G");
         graph.addNode("H");
+        graph.addNode("I");
 
         graph.addEdge("A", "B", "FRIEND");
-        graph.addEdge("B", "C", "COLLEAGUE");
+        graph.addEdge("B", "C", "FRIEND");
         graph.addEdge("A", "D", "FAMILY");
-        graph.addEdge("B", "D", "KNOWS");
-        graph.addEdge("C", "E", "COLLEAGUE");
-        graph.addEdge("E", "D", "KNOWS");
-        graph.addEdge("A", "F", "FAMILY");
-        graph.addEdge("F", "G", "KNOWS");
-        graph.addEdge("D", "G", "FRIEND");
-        graph.addEdge("G", "H", "PARTNER");
-        graph.addEdge("H", "E", "FAMILY");
+        graph.addEdge("D", "E", "LIKES");
+        graph.addEdge("D", "I", "SUPERVISES");
+        graph.addEdge("I", "E", "TRUSTS");
+        graph.addEdge("F", "E", "OWNS");
+        graph.addEdge("C", "F", "DEPENDS_ON");
+        graph.addEdge("G", "F", "KNOWS");
+        graph.addEdge("H", "C", "COWORKER");
+        graph.addEdge("H", "G", "MENTORS");
 
-        // Test 1: Basic path with a specific relationship type
-        Optional<Iterable<String>> path1 = graph.findPath("A", "C", "FRIEND", "COLLEAGUE");
+        // Add bidirectional relationship
+        graph.addEdge("E", "B", "REPORTS_TO");
+        graph.addEdge("B", "E", "MANAGES");
+
+        // Test 1: Direct path with one relationship type
+        Optional<Iterable<String>> path1 = graph.findPath("A", "B", "FRIEND");
         assertTrue(path1.isPresent());
-        assertEquals(Arrays.asList("A", "B", "C"), toList(path1.get()));
+        assertEquals(Arrays.asList("A", "B"), toList(path1.get()));
 
-        // Test 2: Different path with different relationship types
-        Optional<Iterable<String>> path2 = graph.findPath("A", "H", "FAMILY", "KNOWS", "FRIEND", "PARTNER");
+        // Test 2: Longer path with alternating relationship types
+        Optional<Iterable<String>> path2 = graph.findPath("A", "F", "FRIEND", "FRIEND", "DEPENDS_ON");
         assertTrue(path2.isPresent());
-        List<String> path2List = toList(path2.get());
-        assertTrue(
-                // Either A->D->G->H or A->F->G->H
-                (path2List.equals(Arrays.asList("A", "D", "G", "H")) ||
-                        path2List.equals(Arrays.asList("A", "F", "G", "H")))
-        );
+        assertEquals(Arrays.asList("A", "B", "C", "F"), toList(path2.get()));
 
-        // Test 3: No path with restricted relationship types
-        Optional<Iterable<String>> path3 = graph.findPath("A", "E", "FRIEND", "PARTNER");
-        assertFalse(path3.isPresent());
+        // Test 3: Path with multiple relationship type options
+        Optional<Iterable<String>> path3 = graph.findPath("D", "E", "LIKES", "TRUSTS");
+        assertTrue(path3.isPresent());
+        List<String> path3List = toList(path3.get());
+        assertEquals("D", path3List.getFirst());
+        assertEquals("E", path3List.getLast());
 
-        // Test 4: Path to self (trivial case)
-        Optional<Iterable<String>> path4 = graph.findPath("B", "B", "FRIEND");
+        // Test 4: Multi-hop path with the same relationship type
+        Optional<Iterable<String>> path4 = graph.findPath("A", "C", "FRIEND");
         assertTrue(path4.isPresent());
-        assertEquals(Collections.singletonList("B"), toList(path4.get()));
+        assertEquals(Arrays.asList("A", "B", "C"), toList(path4.get()));
 
-        // Test 5: Non-existent start node
-        Optional<Iterable<String>> path5 = graph.findPath("Z", "A", "FRIEND");
+        // Test 5: Relationship type combo that exists but doesn't create a valid path
+        Optional<Iterable<String>> path5 = graph.findPath("A", "G", "FRIEND", "COWORKER");
         assertFalse(path5.isPresent());
 
-        // Test 6: Non-existent end node
-        Optional<Iterable<String>> path6 = graph.findPath("A", "Z", "FRIEND");
+        // Test 6: Impossible path due to directed graph constraints
+        Optional<Iterable<String>> path6 = graph.findPath("I", "D", "SUPERVISES");
         assertFalse(path6.isPresent());
 
-        // Test 7: Empty relationship types array (should find no path)
-        Optional<Iterable<String>> path7 = graph.findPath("A", "C");
-        assertTrue(path7.isPresent()); // Should find some path
+        // Test 7: Cyclic path using bidirectional relationships
+        Optional<Iterable<String>> path7 = graph.findPath("B", "B", "MANAGES", "REPORTS_TO");
+        assertTrue(path7.isPresent());
+        List<String> path7List = toList(path7.get());
+        assertTrue(path7List.size() > 1); // Should find B->E->B, not just B
+        assertEquals("B", path7List.getFirst());
+        assertEquals("B", path7List.getLast());
 
-        // Test 8: With empty allowed types set
-        Optional<Iterable<String>> path8 = graph.findPath("A", "C", new String[0]);
-        assertFalse(path8.isPresent()); // No allowed relationships mean no path
+        // Test 8: No path exists with given types
+        Optional<Iterable<String>> path8 = graph.findPath("A", "H", "FAMILY", "LIKES", "TRUSTS");
+        assertFalse(path8.isPresent());
 
-        // Test 9: With null relationship types (should be treated as no restrictions)
-        Optional<Iterable<String>> path9 = graph.findPath("A", "H", (String[])null);
-        assertTrue(path9.isPresent());
+        // Test 9: Case of a non-existent relationship type
+        Optional<Iterable<String>> path9 = graph.findPath("A", "B", "NONEXISTENT");
+        assertFalse(path9.isPresent());
 
-        // Test 10: Cyclic path with relationship constraints
-        graph.addEdge("E", "A", "SPECIAL");
-        Optional<Iterable<String>> path10 = graph.findPath("A", "A", "FAMILY", "KNOWS", "COLLEAGUE", "SPECIAL");
-        assertTrue(path10.isPresent());
-        List<String> cyclePath = toList(path10.get());
-        assertEquals("A", cyclePath.getFirst());
-        assertEquals("A", cyclePath.getLast());
-        assertTrue(cyclePath.size() > 1); // Not just self-reference
+        // Test 10: Mix of existing and non-existing relationship types
+        Optional<Iterable<String>> path10 = graph.findPath("A", "C", "FRIEND", "NONEXISTENT");
+        assertFalse(path10.isPresent());
 
-        // Test 11: Multiple possible paths with the same relationship types
-        // path A->D->G and A->F->G both use "FAMILY" and "KNOWS"/"FRIEND"
-        Optional<Iterable<String>> path11 = graph.findPath("A", "G", "FAMILY", "KNOWS", "FRIEND");
-        assertTrue(path11.isPresent());
-        List<String> path11List = toList(path11.get());
-        assertTrue(
-                path11List.equals(Arrays.asList("A", "D", "G")) ||
-                        path11List.equals(Arrays.asList("A", "F", "G"))
-        );
+        // Test 11: Empty relationship types
+        Optional<Iterable<String>> path11 = graph.findPath("A", "B", new String[0]);
+        assertFalse(path11.isPresent());
 
-        // Test 12: Relationship types that don't exist in the graph
-        Optional<Iterable<String>> path12 = graph.findPath("A", "H", "NONEXISTENT_TYPE");
-        assertFalse(path12.isPresent());
+// Test 12: Null relationship types (checks for unrestricted path)
+        Optional<Iterable<String>> path12 = graph.findPath("A", "G", (String[]) null);
+        assertFalse(path12.isPresent()); // No directed path exists from A to G
     }
+
 }

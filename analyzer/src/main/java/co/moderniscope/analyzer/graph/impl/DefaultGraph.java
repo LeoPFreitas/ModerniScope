@@ -227,22 +227,41 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
             return Optional.empty();
         }
 
-        // Handle special case for empty relationship types array
-        if (relationshipTypes != null && relationshipTypes.length == 0) {
+        // Handle special cases based on relationship types
+        if (relationshipTypes == null) {
+            // Explicitly passed null - use unrestricted path finding
+            return findPath(start, end);
+        } else if (relationshipTypes.length == 0) {
+            // No relationship types allowed - no path possible
             return Optional.empty();
         }
 
-        // For simple self-referencing path with no specific relationship types
-        if (start.equals(end) && relationshipTypes == null) {
+        // Verify all relationship types exist in the graph before proceeding
+        for (String type : relationshipTypes) {
+            boolean typeExists = false;
+            for (DefaultNode<N, DefaultEdge<N, E>> node : nodes.values()) {
+                for (DefaultEdge<N, E> edge : node.getOutgoingEdges()) {
+                    if (edge.getType().toString().equals(type)) {
+                        typeExists = true;
+                        break;
+                    }
+                }
+                if (typeExists) break;
+            }
+            if (!typeExists) {
+                return Optional.empty(); // If any type doesn't exist, no path is possible
+            }
+        }
+
+        // Simple self-reference path - only valid if no traversal is needed
+        if (start.equals(end) && nodes.get(start).getOutgoingEdges().isEmpty()) {
             return Optional.of(Collections.singletonList(start));
         }
 
-        // Create a set of allowed types
-        Set<String> allowedTypes = relationshipTypes == null ?
-                null :
-                new HashSet<>(Arrays.asList(relationshipTypes));
+        // Create a set of allowed relationship types
+        Set<String> allowedTypes = new HashSet<>(Arrays.asList(relationshipTypes));
 
-        // Use BFS to find path
+        // BFS to find a path with relationship type filtering
         Map<N, N> predecessors = new HashMap<>();
         Queue<N> queue = new LinkedList<>();
         Set<N> visited = new HashSet<>();
@@ -250,65 +269,44 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
         queue.add(start);
         visited.add(start);
 
-        // For cyclic paths when start equals end
-        boolean isCycleSearch = start.equals(end);
-        boolean foundCycle = false;
-
         while (!queue.isEmpty()) {
             N current = queue.poll();
             DefaultNode<N, DefaultEdge<N, E>> currentNode = nodes.get(current);
 
             for (DefaultEdge<N, E> edge : currentNode.getOutgoingEdges()) {
-                // Check relationship type filter
-                if (allowedTypes != null && !allowedTypes.contains(edge.getType().toString())) {
+                // Only consider the edges of allowed relationship types
+                if (!allowedTypes.contains(edge.getType().toString())) {
                     continue;
                 }
 
                 N neighbor = edge.getTarget();
 
-                // Handle cycle detection - only if not coming directly from start
-                if (isCycleSearch && neighbor.equals(end) && !current.equals(start)) {
-                    predecessors.put(end, current);
-                    foundCycle = true;
-                    break;
+                // For cycle detection when looking for a path back to the start
+                if (neighbor.equals(end)) {
+                    // Reconstruct the path
+                    List<N> path = new ArrayList<>();
+                    path.add(end); // Add end node
+
+                    // Only add predecessors if we're not directly connecting start to end
+                    if (!current.equals(start)) {
+                        N step = current;
+                        while (step != null) {
+                            path.addFirst(step);
+                            step = predecessors.get(step);
+                        }
+                    } else {
+                        path.addFirst(start);
+                    }
+
+                    return Optional.of(path);
                 }
-                // Handle normal path finding
-                else if (!visited.contains(neighbor)) {
+
+                if (!visited.contains(neighbor)) {
                     predecessors.put(neighbor, current);
                     visited.add(neighbor);
                     queue.add(neighbor);
-
-                    if (neighbor.equals(end) && !isCycleSearch) {
-                        // Found path for normal case
-                        List<N> path = new ArrayList<>();
-                        N step = end;
-                        while (step != null) {
-                            path.add(0, step);
-                            step = predecessors.get(step);
-                        }
-                        return Optional.of(path);
-                    }
                 }
             }
-
-            if (foundCycle) {
-                break;
-            }
-        }
-
-        // Construct cycle path if found
-        if (isCycleSearch && foundCycle) {
-            List<N> cyclePath = new ArrayList<>();
-            cyclePath.add(end);  // Add the end node (which is also start)
-
-            N step = predecessors.get(end);
-            while (step != null && !step.equals(start)) {
-                cyclePath.add(0, step);
-                step = predecessors.get(step);
-            }
-
-            cyclePath.add(0, start);  // Add start node at beginning
-            return Optional.of(cyclePath);
         }
 
         return Optional.empty();
