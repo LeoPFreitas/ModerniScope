@@ -3,6 +3,7 @@ package co.moderniscope.analyzer.graph.impl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -1258,7 +1259,7 @@ class DefaultGraphTest {
         // Create an isolated node with no outgoing edges
         graph.addNode("Isolated");
 
-        // Test finding path from the node to itself
+        // Test finding a path from the node to itself
         Optional<Iterable<String>> selfPath = graph.findPath("Isolated", "Isolated", "SOME_TYPE");
 
         // Verify path exists and contains only the node itself
@@ -1285,4 +1286,282 @@ class DefaultGraphTest {
         assertTrue(selfPathWithEdges.isPresent());
     }
 
+    @Test
+    void testTraverseBreadthFirstSkipsAlreadyVisitedNodes() {
+        // Create a graph with cycles to ensure some nodes will be encountered multiple times
+        // A → B → C
+        // ↑     ↓
+        // └─ D ←┘
+
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+
+        graph.addEdge("A", "B", "CONNECT");
+        graph.addEdge("B", "C", "CONNECT");
+        graph.addEdge("C", "D", "CONNECT");
+        graph.addEdge("D", "A", "CONNECT");
+
+        // Add a direct edge from C to A to create a shorter cycle
+        graph.addEdge("C", "A", "CONNECT");
+
+        // Keep track of visited nodes and visit count
+        Map<String, Integer> visitCounts = new HashMap<>();
+
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            visitCounts.put(node, visitCounts.getOrDefault(node, 0) + 1);
+            return true;
+        });
+
+        // Verify each node is visited exactly once despite the cycles
+        assertEquals(4, visitCounts.size());
+        assertEquals(1, visitCounts.get("A"));
+        assertEquals(1, visitCounts.get("B"));
+        assertEquals(1, visitCounts.get("C"));
+        assertEquals(1, visitCounts.get("D"));
+
+        // Verify nodes are visited in correct BFS order
+        List<String> visitedOrder = new ArrayList<>();
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            visitedOrder.add(node);
+            return true;
+        });
+
+        // The order should be: A, B, C, D (not A, B, C, A, D which would happen if we revisited A)
+        assertEquals(Arrays.asList("A", "B", "C", "D"), visitedOrder);
+    }
+
+    @Test
+    void testRemoveNodeWithInconsistentLabelIndex() throws Exception {
+        // Create a node with a label
+        graph.addNode("A", null, "TestLabel");
+
+        // Verify node exists with label
+        assertTrue(graph.getNodes().contains("A"));
+        assertTrue(graph.getNodesByLabel("TestLabel").contains("A"));
+
+        // Use reflection to access and modify the private nodesByLabel map
+        var nodesByLabelField = DefaultGraph.class.getDeclaredField("nodesByLabel");
+        nodesByLabelField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Set<String>> nodesByLabel = (Map<String, Set<String>>) nodesByLabelField.get(graph);
+
+        // Remove the label from the index but keep it on the node
+        nodesByLabel.remove("TestLabel");
+
+        // Verify the inconsistent state
+        assertTrue(graph.getNodesByLabel("TestLabel").isEmpty());
+
+        // Now remove the node - this should test the label != null condition when false
+        boolean result = graph.removeNode("A");
+
+        // Verify node was successfully removed despite inconsistent label state
+        assertTrue(result);
+        assertFalse(graph.getNodes().contains("A"));
+    }
+
+    @Test
+    void testRemoveEdgeWithNonExistentTargetNode() {
+        // Add a source node but not a target node
+        graph.addNode("Source");
+
+        // Try to remove an edge where the target doesn't exist
+        boolean result = graph.removeEdge("Source", "NonExistentTarget", "CONNECT");
+
+        // Verify that the operation fails
+        assertFalse(result);
+
+        // Also test the removeEdges method with non-existent target
+        int removedCount = graph.removeEdges("Source", "NonExistentTarget", "CONNECT");
+
+        // Verify that no edges were removed
+        assertEquals(0, removedCount);
+    }
+
+    @Test
+    void testRemoveEdgeWithNonMatchingTargetOrType() {
+        // Setup a graph with a source node having multiple edges
+        graph.addNode("Source");
+        graph.addNode("Target1");
+        graph.addNode("Target2");
+
+        // Add edges with different targets and types
+        graph.addEdge("Source", "Target1", "TYPE_A");
+        graph.addEdge("Source", "Target1", "TYPE_B");
+        graph.addEdge("Source", "Target2", "TYPE_A");
+
+        // Try to remove an edge with existing source but different target and type combination
+        boolean result = graph.removeEdge("Source", "Target1", "TYPE_C");
+
+        // Verify that no edge was removed (false returned)
+        assertFalse(result);
+
+        // Also try with existing type but wrong target
+        result = graph.removeEdge("Source", "Target3", "TYPE_A");
+        assertFalse(result);
+
+        // Verify all original edges are still present
+        Map<String, Set<String>> outgoingEdges = graph.getOutgoingEdges("Source");
+        assertEquals(2, outgoingEdges.size());
+        assertTrue(outgoingEdges.containsKey("Target1"));
+        assertTrue(outgoingEdges.containsKey("Target2"));
+
+        // Verify both edge types to Target1 still exist
+        Set<String> edgesToTarget1 = outgoingEdges.get("Target1");
+        assertEquals(2, edgesToTarget1.size());
+        assertTrue(edgesToTarget1.contains("TYPE_A"));
+        assertTrue(edgesToTarget1.contains("TYPE_B"));
+    }
+
+    @Test
+    void testRemoveNodeWithNonExistentTargetNode() throws Exception {
+        // Create two nodes and connect them with an edge
+        graph.addNode("Source");
+        graph.addNode("Target");
+        graph.addEdge("Source", "Target", "CONNECTS");
+
+        // Use reflection to access the nodes map
+        var nodesField = DefaultGraph.class.getDeclaredField("nodes");
+        nodesField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> nodes = (Map<Object, Object>) nodesField.get(graph);
+
+        // Remove Target node from the internal map directly to create inconsistency
+        // (edge still points to Target, but Target node doesn't exist in nodes map)
+        nodes.remove("Target");
+
+        // Verify the inconsistent state
+        assertTrue(graph.getNodes().contains("Source"));
+        assertFalse(graph.getNodes().contains("Target"));
+        assertFalse(graph.getOutgoingEdges("Source").isEmpty());
+
+        // Now remove Source node - this should test the targetNode != null condition
+        boolean result = graph.removeNode("Source");
+
+        // Verify node was successfully removed despite inconsistent edge state
+        assertTrue(result);
+        assertFalse(graph.getNodes().contains("Source"));
+    }
+
+    @Test
+    void testRemoveNodeWithNonExistentSourceNode() throws Exception {
+        // Create two nodes and connect them with an edge
+        graph.addNode("Target");
+        graph.addNode("Source");
+        graph.addEdge("Source", "Target", "CONNECTS");
+
+        // Use reflection to access the nodes map
+        var nodesField = DefaultGraph.class.getDeclaredField("nodes");
+        nodesField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> nodes = (Map<Object, Object>) nodesField.get(graph);
+
+        // Remove Source node from the internal map directly to create inconsistency
+        // (edge still points from Source, but Source node doesn't exist in nodes map)
+        nodes.remove("Source");
+
+        // Verify the inconsistent state
+        assertTrue(graph.getNodes().contains("Target"));
+        assertFalse(graph.getNodes().contains("Source"));
+        assertFalse(graph.getIncomingEdges("Target").isEmpty());
+
+        // Now remove Target node - this should test the sourceNode != null condition
+        boolean result = graph.removeNode("Target");
+
+        // Verify node was successfully removed despite inconsistent edge state
+        assertTrue(result);
+        assertFalse(graph.getNodes().contains("Target"));
+    }
+
+    @Test
+    void testRemoveEdgesWithNonMatchingTarget() {
+        // Set up a graph with a source node having multiple edges to different targets
+        graph.addNode("Source");
+        graph.addNode("Target1");
+        graph.addNode("Target2");
+
+        // Add edges with the same relationship type to different targets
+        graph.addEdge("Source", "Target1", "RELATES_TO");
+        graph.addEdge("Source", "Target2", "RELATES_TO");
+
+        // Try to remove edges with the correct relationship type but a non-matching target
+        // (trying to remove RELATES_TO edges to Target3, but edges only go to Target1 and Target2)
+        int removedCount = graph.removeEdges("Source", "Target3", "RELATES_TO");
+
+        // Verify that no edges were removed
+        assertEquals(0, removedCount);
+
+        // Verify all original edges are still present
+        Map<String, Set<String>> outgoingEdges = graph.getOutgoingEdges("Source");
+        assertEquals(2, outgoingEdges.size());
+        assertTrue(outgoingEdges.containsKey("Target1"));
+        assertTrue(outgoingEdges.containsKey("Target2"));
+        assertTrue(outgoingEdges.get("Target1").contains("RELATES_TO"));
+        assertTrue(outgoingEdges.get("Target2").contains("RELATES_TO"));
+    }
+
+    @Test
+    void testRemoveEdgesWithTargetMismatch() {
+        // Set up a graph with a source node connected to multiple targets
+        graph.addNode("Source");
+        graph.addNode("Target1");
+        graph.addNode("Target2");
+        graph.addNode("NonMatchingTarget"); // This exists in the graph but has no edge to it
+
+        // Add edges from Source to Target1 and Target2
+        graph.addEdge("Source", "Target1", "CONNECTS");
+        graph.addEdge("Source", "Target2", "CONNECTS");
+
+        // Get initial state for verification
+        Map<String, Set<String>> initialEdges = graph.getOutgoingEdges("Source");
+        assertEquals(2, initialEdges.size());
+
+        // Call removeEdges with Target1 and observe that only edges to Target1 are removed
+        int count = graph.removeEdges("Source", "NonMatchingTarget", "CONNECTS");
+
+        // Verify no edges were removed (the target.equals() condition was false for all edges)
+        assertEquals(0, count);
+
+        // Verify the graph state is unchanged
+        Map<String, Set<String>> finalEdges = graph.getOutgoingEdges("Source");
+        assertEquals(2, finalEdges.size());
+        assertTrue(finalEdges.containsKey("Target1"));
+        assertTrue(finalEdges.containsKey("Target2"));
+    }
+
+    @Test
+    void testDfsSkipsAlreadyVisitedNodes() {
+        // Create a graph with a cycle: A -> B -> C -> A
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        graph.addEdge("A", "B", "CONNECTS");
+        graph.addEdge("B", "C", "CONNECTS");
+        graph.addEdge("C", "A", "CONNECTS"); // Creates a cycle
+
+        // Track visited nodes in traversal order
+        List<String> visitedOrder = new ArrayList<>();
+
+        graph.traverseDepthFirst("A", (node, depth) -> {
+            visitedOrder.add(node);
+            return true;
+        });
+
+        // Verify the traversal visits each node exactly once
+        // If !visited.contains(neighbor) condition works correctly,
+        // we should see A, B, C without A repeating
+        assertEquals(3, visitedOrder.size());
+        assertEquals("A", visitedOrder.get(0));
+        assertEquals("B", visitedOrder.get(1));
+        assertEquals("C", visitedOrder.get(2));
+
+        // Confirm nodes were only visited once
+        Set<String> uniqueNodes = new HashSet<>(visitedOrder);
+        assertEquals(3, uniqueNodes.size());
+    }
 }
