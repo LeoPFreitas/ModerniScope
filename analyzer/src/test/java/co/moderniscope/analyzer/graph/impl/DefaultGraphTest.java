@@ -3,9 +3,7 @@ package co.moderniscope.analyzer.graph.impl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,7 +67,7 @@ class DefaultGraphTest {
     }
 
     @Test
-    void testRemoveNode() {
+    void testRemoveNodeBasic() {
         // Add nodes
         graph.addNode("A");
         graph.addNode("B");
@@ -217,4 +215,1015 @@ class DefaultGraphTest {
         assertFalse(colleagueEdges.containsKey("C"));
     }
 
+    @Test
+    void testGetNodes() {
+        // Empty graph should return an empty set
+        Set<String> emptyNodes = graph.getNodes();
+        assertTrue(emptyNodes.isEmpty());
+
+        // Add several nodes
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        // Verify all nodes are returned
+        Set<String> nodes = graph.getNodes();
+        assertEquals(3, nodes.size());
+        assertTrue(nodes.contains("A"));
+        assertTrue(nodes.contains("B"));
+        assertTrue(nodes.contains("C"));
+
+        // Remove a node
+        graph.removeNode("B");
+
+        // Verify updated set
+        nodes = graph.getNodes();
+        assertEquals(2, nodes.size());
+        assertTrue(nodes.contains("A"));
+        assertTrue(nodes.contains("C"));
+        assertFalse(nodes.contains("B"));
+
+        // Verify the returned set is a copy (can't modify the graph)
+        Set<String> nodesCopy = graph.getNodes();
+        nodesCopy.remove("A");
+        assertEquals(1, nodesCopy.size());
+
+        // The Original graph should be unchanged
+        assertEquals(2, graph.getNodes().size());
+        assertTrue(graph.getNodes().contains("A"));
+    }
+
+    @Test
+    void testGetNodesByLabel() {
+        // Add nodes with different label combinations
+        graph.addNode("A", null, "Label1", "Label2");
+        graph.addNode("B", null, "Label1");
+        graph.addNode("C", null, "Label2", "Label3");
+        graph.addNode("D", null, "Label3");
+        graph.addNode("E");  // No labels
+
+        // Test retrieving by Label1
+        Set<String> nodesWithLabel1 = graph.getNodesByLabel("Label1");
+        assertEquals(2, nodesWithLabel1.size());
+        assertTrue(nodesWithLabel1.contains("A"));
+        assertTrue(nodesWithLabel1.contains("B"));
+
+        // Test retrieving by Label2
+        Set<String> nodesWithLabel2 = graph.getNodesByLabel("Label2");
+        assertEquals(2, nodesWithLabel2.size());
+        assertTrue(nodesWithLabel2.contains("A"));
+        assertTrue(nodesWithLabel2.contains("C"));
+
+        // Test retrieving by Label3
+        Set<String> nodesWithLabel3 = graph.getNodesByLabel("Label3");
+        assertEquals(2, nodesWithLabel3.size());
+        assertTrue(nodesWithLabel3.contains("C"));
+        assertTrue(nodesWithLabel3.contains("D"));
+
+        // Test retrieving by non-existent label
+        Set<String> nodesWithNonExistentLabel = graph.getNodesByLabel("NonExistentLabel");
+        assertTrue(nodesWithNonExistentLabel.isEmpty());
+
+        // Verify the returned set is a copy (can't modify the graph)
+        Set<String> labelCopy = graph.getNodesByLabel("Label1");
+        labelCopy.remove("A");
+        assertEquals(1, labelCopy.size());
+
+        // The Original index should be unchanged
+        assertEquals(2, graph.getNodesByLabel("Label1").size());
+    }
+
+    @Test
+    void testGetNodeProperties() {
+        // Test with a non-existent node
+        Map<String, Object> nonExistentProps = graph.getNodeProperties("NonExistent");
+        assertTrue(nonExistentProps.isEmpty());
+
+        // Create a node with no properties
+        graph.addNode("A");
+        Map<String, Object> emptyProps = graph.getNodeProperties("A");
+        assertTrue(emptyProps.isEmpty());
+
+        // Create a node with properties
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("name", "Node B");
+        properties.put("age", 30);
+        properties.put("active", true);
+        graph.addNode("B", properties);
+
+        // Retrieve and verify properties
+        Map<String, Object> retrievedProps = graph.getNodeProperties("B");
+        assertEquals(3, retrievedProps.size());
+        assertEquals("Node B", retrievedProps.get("name"));
+        assertEquals(30, retrievedProps.get("age"));
+        assertEquals(true, retrievedProps.get("active"));
+
+        // Verify a returned map is a copy (can't modify the node)
+        retrievedProps.put("modified", "value");
+        assertEquals(4, retrievedProps.size());
+
+        // Original node properties should be unchanged
+        Map<String, Object> reRetrievedProps = graph.getNodeProperties("B");
+        assertEquals(3, reRetrievedProps.size());
+        assertNull(reRetrievedProps.get("modified"));
+
+        // Update properties
+        Map<String, Object> updatedProps = new HashMap<>();
+        updatedProps.put("name", "Updated B");
+        updatedProps.put("status", "premium");
+        graph.addNode("B", updatedProps);
+
+        // Verify properties were updated/merged
+        Map<String, Object> afterUpdateProps = graph.getNodeProperties("B");
+        assertEquals(4, afterUpdateProps.size());
+        assertEquals("Updated B", afterUpdateProps.get("name"));
+        assertEquals(30, afterUpdateProps.get("age"));
+        assertEquals(true, afterUpdateProps.get("active"));
+        assertEquals("premium", afterUpdateProps.get("status"));
+    }
+
+    @Test
+    void testGetOutgoingEdges() {
+        // Test with non-existent node
+        Map<String, Set<String>> nonExistentEdges = graph.getOutgoingEdges("NonExistent");
+        assertTrue(nonExistentEdges.isEmpty());
+
+        // Create test graph structure
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        graph.addEdge("A", "B", "KNOWS");
+        graph.addEdge("A", "B", "WORKS_WITH");
+        graph.addEdge("A", "C", "FOLLOWS");
+        graph.addEdge("C", "A", "FOLLOWS");
+
+        // Get all outgoing edges from A
+        Map<String, Set<String>> aEdges = graph.getOutgoingEdges("A");
+        assertEquals(2, aEdges.size());
+
+        // Check B's incoming relationships from A
+        Set<String> aToBRelationships = aEdges.get("B");
+        assertEquals(2, aToBRelationships.size());
+        assertTrue(aToBRelationships.contains("KNOWS"));
+        assertTrue(aToBRelationships.contains("WORKS_WITH"));
+
+        // Check C's incoming relationships from A
+        Set<String> aToCRelationships = aEdges.get("C");
+        assertEquals(1, aToCRelationships.size());
+        assertTrue(aToCRelationships.contains("FOLLOWS"));
+
+        // Verify the returned map is a copy
+        aEdges.remove("B");
+        assertEquals(1, aEdges.size());
+        assertEquals(2, graph.getOutgoingEdges("A").size());
+    }
+
+    @Test
+    void testGetOutgoingEdgesByRelationshipType() {
+        // Create a test graph structure
+        graph.addNode("X");
+        graph.addNode("Y");
+        graph.addNode("Z");
+
+        graph.addEdge("X", "Y", "FRIEND");
+        graph.addEdge("X", "Z", "FRIEND");
+        graph.addEdge("X", "Y", "COLLEAGUE");
+
+        // Test filtering by relationship type (FRIEND)
+        Map<String, Set<String>> friendEdges = graph.getOutgoingEdges("X", "FRIEND");
+        assertEquals(2, friendEdges.size());
+        assertTrue(friendEdges.containsKey("Y"));
+        assertTrue(friendEdges.containsKey("Z"));
+
+        // Test filtering by relationship type (COLLEAGUE)
+        Map<String, Set<String>> colleagueEdges = graph.getOutgoingEdges("X", "COLLEAGUE");
+        assertEquals(1, colleagueEdges.size());
+        assertTrue(colleagueEdges.containsKey("Y"));
+        assertFalse(colleagueEdges.containsKey("Z"));
+
+        // Test with a non-existent relationship type
+        Map<String, Set<String>> nonExistentRelationships = graph.getOutgoingEdges("X", "FAMILY");
+        assertTrue(nonExistentRelationships.isEmpty());
+
+        // Test with non-existent source node
+        Map<String, Set<String>> nonExistentNodeEdges = graph.getOutgoingEdges("NonExistent", "FRIEND");
+        assertTrue(nonExistentNodeEdges.isEmpty());
+    }
+
+    @Test
+    void testGetIncomingEdges() {
+        // Test with non-existent node
+        Map<String, Set<String>> nonExistentEdges = graph.getIncomingEdges("NonExistent");
+        assertTrue(nonExistentEdges.isEmpty());
+
+        // Create test graph structure
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        graph.addEdge("A", "C", "KNOWS");
+        graph.addEdge("B", "C", "KNOWS");
+        graph.addEdge("B", "C", "WORKS_WITH");
+        graph.addEdge("C", "A", "LIKES");
+
+        // Get all incoming edges to C
+        Map<String, Set<String>> cEdges = graph.getIncomingEdges("C");
+        assertEquals(2, cEdges.size());
+
+        // Check A's outgoing relationships to C
+        Set<String> aToCRelationships = cEdges.get("A");
+        assertEquals(1, aToCRelationships.size());
+        assertTrue(aToCRelationships.contains("KNOWS"));
+
+        // Check B's outgoing relationships to C
+        Set<String> bToCRelationships = cEdges.get("B");
+        assertEquals(2, bToCRelationships.size());
+        assertTrue(bToCRelationships.contains("KNOWS"));
+        assertTrue(bToCRelationships.contains("WORKS_WITH"));
+
+        // Verify the returned map is a copy
+        cEdges.remove("A");
+        assertEquals(1, cEdges.size());
+        assertEquals(2, graph.getIncomingEdges("C").size());
+    }
+
+    @Test
+    void testGetIncomingEdgesByRelationshipType() {
+        // Create a test graph structure
+        graph.addNode("X");
+        graph.addNode("Y");
+        graph.addNode("Z");
+
+        graph.addEdge("X", "Z", "FRIEND");
+        graph.addEdge("Y", "Z", "FRIEND");
+        graph.addEdge("Y", "Z", "COLLEAGUE");
+
+        // Test filtering by relationship type (FRIEND)
+        Map<String, Set<String>> friendEdges = graph.getIncomingEdges("Z", "FRIEND");
+        assertEquals(2, friendEdges.size());
+        assertTrue(friendEdges.containsKey("X"));
+        assertTrue(friendEdges.containsKey("Y"));
+
+        // Test filtering by relationship type (COLLEAGUE)
+        Map<String, Set<String>> colleagueEdges = graph.getIncomingEdges("Z", "COLLEAGUE");
+        assertEquals(1, colleagueEdges.size());
+        assertTrue(colleagueEdges.containsKey("Y"));
+        assertFalse(colleagueEdges.containsKey("X"));
+
+        // Test with a non-existent relationship type
+        Map<String, Set<String>> nonExistentRelationships = graph.getIncomingEdges("Z", "FAMILY");
+        assertTrue(nonExistentRelationships.isEmpty());
+
+        // Test with a non-existent target node
+        Map<String, Set<String>> nonExistentNodeEdges = graph.getIncomingEdges("NonExistent", "FRIEND");
+        assertTrue(nonExistentNodeEdges.isEmpty());
+    }
+
+    @Test
+    void testGetEdgeProperties() {
+        // Test with non-existent source node
+        Map<String, Object> nonExistentSourceProps = graph.getEdgeProperties("NonExistent", "B", "CONNECTS");
+        assertTrue(nonExistentSourceProps.isEmpty());
+
+        // Create nodes and add edges
+        graph.addNode("A");
+        graph.addNode("B");
+
+        // Test with existing nodes but no edge
+        Map<String, Object> nonExistentEdgeProps = graph.getEdgeProperties("A", "B", "CONNECTS");
+        assertTrue(nonExistentEdgeProps.isEmpty());
+
+        // Add edge with no properties
+        graph.addEdge("A", "B", "CONNECTS");
+        Map<String, Object> emptyProps = graph.getEdgeProperties("A", "B", "CONNECTS");
+        assertTrue(emptyProps.isEmpty());
+
+        // Add edge with properties
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("weight", 10);
+        properties.put("distance", 2.5);
+        properties.put("active", true);
+        graph.addEdge("A", "B", "RELATES", properties);
+
+        // Verify properties for a specific edge type
+        Map<String, Object> retrievedProps = graph.getEdgeProperties("A", "B", "RELATES");
+        assertEquals(3, retrievedProps.size());
+        assertEquals(10, retrievedProps.get("weight"));
+        assertEquals(2.5, retrievedProps.get("distance"));
+        assertEquals(true, retrievedProps.get("active"));
+
+        // Verify properties are not mixed between edge types
+        Map<String, Object> otherEdgeProps = graph.getEdgeProperties("A", "B", "CONNECTS");
+        assertTrue(otherEdgeProps.isEmpty());
+
+        // Verify the returned map is a copy
+        retrievedProps.put("modified", "value");
+        assertEquals(4, retrievedProps.size());
+
+        // Original-edge properties should be unchanged
+        Map<String, Object> reRetrievedProps = graph.getEdgeProperties("A", "B", "RELATES");
+        assertEquals(3, reRetrievedProps.size());
+        assertNull(reRetrievedProps.get("modified"));
+    }
+
+    @Test
+    void testFindPath() {
+        // Create a graph structure
+        //    A --- B --- C
+        //    |           |
+        //    +--- D --- E
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+        graph.addNode("E");
+
+        graph.addEdge("A", "B", "CONNECTS");
+        graph.addEdge("B", "C", "CONNECTS");
+        graph.addEdge("A", "D", "CONNECTS");
+        graph.addEdge("D", "E", "CONNECTS");
+        graph.addEdge("E", "C", "CONNECTS");
+
+        // Test direct path
+        Optional<Iterable<String>> path1 = graph.findPath("A", "B");
+        assertTrue(path1.isPresent());
+        List<String> path1List = toList(path1.get());
+        assertEquals(Arrays.asList("A", "B"), path1List);
+
+        // Test a longer path
+        Optional<Iterable<String>> path2 = graph.findPath("A", "C");
+        assertTrue(path2.isPresent());
+        List<String> path2List = toList(path2.get());
+        assertEquals(Arrays.asList("A", "B", "C"), path2List);
+
+        // Test with no path
+        graph.addNode("F");  // Isolated node
+        Optional<Iterable<String>> path3 = graph.findPath("A", "F");
+        assertFalse(path3.isPresent());
+
+        // Test path to self
+        Optional<Iterable<String>> path4 = graph.findPath("A", "A");
+        assertTrue(path4.isPresent());
+        List<String> path4List = toList(path4.get());
+        assertEquals(Collections.singletonList("A"), path4List);
+
+        // Test with non-existent nodes
+        Optional<Iterable<String>> path5 = graph.findPath("A", "Z");
+        assertFalse(path5.isPresent());
+        Optional<Iterable<String>> path6 = graph.findPath("Z", "A");
+        assertFalse(path6.isPresent());
+    }
+
+    @Test
+    void testFindPathWithRelationshipTypes() {
+        // Create a graph with different relationship types
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+
+        graph.addEdge("A", "B", "FRIEND");
+        graph.addEdge("B", "C", "COLLEAGUE");
+        graph.addEdge("C", "D", "FAMILY");
+        graph.addEdge("A", "D", "NEIGHBOR");
+
+        // Test path with a specific relationship type
+        Optional<Iterable<String>> path1 = graph.findPath("A", "D", "NEIGHBOR");
+        assertTrue(path1.isPresent());
+        List<String> path1List = toList(path1.get());
+        assertEquals(Arrays.asList("A", "D"), path1List);
+
+        // Test path with multiple allowed relationship types
+        Optional<Iterable<String>> path2 = graph.findPath("A", "C", "FRIEND", "COLLEAGUE");
+        assertTrue(path2.isPresent());
+        List<String> path2List = toList(path2.get());
+        assertEquals(Arrays.asList("A", "B", "C"), path2List);
+
+        // Test where relationship type constraint prevents a path
+        Optional<Iterable<String>> path3 = graph.findPath("A", "D", "FRIEND", "COLLEAGUE");
+        assertFalse(path3.isPresent());
+
+        // Complete path with all relationship types
+        Optional<Iterable<String>> path4 = graph.findPath("A", "D", "FRIEND", "COLLEAGUE", "FAMILY");
+        assertTrue(path4.isPresent());
+        List<String> path4List = toList(path4.get());
+        assertEquals(Arrays.asList("A", "B", "C", "D"), path4List);
+    }
+
+    // Helper method to convert Iterable to List for easier assertions
+    private <T> List<T> toList(Iterable<T> iterable) {
+        List<T> result = new ArrayList<>();
+        iterable.forEach(result::add);
+        return result;
+    }
+
+    @Test
+    void testTraverseDepthFirst() {
+        // Create a graph structure
+        //      A
+        //     / \
+        //    B   C
+        //   / \   \
+        //  D   E   F
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+        graph.addNode("E");
+        graph.addNode("F");
+
+        graph.addEdge("A", "B", "CONNECT");
+        graph.addEdge("A", "C", "CONNECT");
+        graph.addEdge("B", "D", "CONNECT");
+        graph.addEdge("B", "E", "CONNECT");
+        graph.addEdge("C", "F", "CONNECT");
+
+        // Collect visited nodes and depths in order
+        List<String> visitedNodes = new ArrayList<>();
+        List<Integer> visitedDepths = new ArrayList<>();
+
+        graph.traverseDepthFirst("A", (node, depth) -> {
+            visitedNodes.add(node);
+            visitedDepths.add(depth);
+            return true;
+        });
+
+        // DFS should explore one branch fully before another
+        // Expected order: A -> B -> D -> E -> C -> F
+        assertEquals(6, visitedNodes.size());
+        assertEquals("A", visitedNodes.getFirst());
+        assertEquals(0, visitedDepths.getFirst());
+
+        // Verify B is visited before C (DFS explores the first branch fully)
+        assertTrue(visitedNodes.indexOf("B") < visitedNodes.indexOf("C"));
+
+        // Verify D and E come after B but before C
+        assertTrue(visitedNodes.indexOf("B") < visitedNodes.indexOf("D"));
+        assertTrue(visitedNodes.indexOf("B") < visitedNodes.indexOf("E"));
+        assertTrue(visitedNodes.indexOf("D") < visitedNodes.indexOf("C"));
+        assertTrue(visitedNodes.indexOf("E") < visitedNodes.indexOf("C"));
+
+        // Verify F comes after C
+        assertTrue(visitedNodes.indexOf("C") < visitedNodes.indexOf("F"));
+
+        // Verify depths are correct
+        assertEquals(0, visitedDepths.get(visitedNodes.indexOf("A")));
+        assertEquals(1, visitedDepths.get(visitedNodes.indexOf("B")));
+        assertEquals(1, visitedDepths.get(visitedNodes.indexOf("C")));
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("D")));
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("E")));
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("F")));
+
+        // Test early termination
+        List<String> earlyTerminationNodes = new ArrayList<>();
+        graph.traverseDepthFirst("A", (node, depth) -> {
+            earlyTerminationNodes.add(node);
+            return !node.equals("B"); // Stop once we find B
+        });
+
+        assertEquals(2, earlyTerminationNodes.size());
+        assertEquals("A", earlyTerminationNodes.get(0));
+        assertEquals("B", earlyTerminationNodes.get(1));
+
+        // Test with a non-existent start node
+        List<String> nonExistentStart = new ArrayList<>();
+        graph.traverseDepthFirst("Z", (node, depth) -> {
+            nonExistentStart.add(node);
+            return true;
+        });
+        assertTrue(nonExistentStart.isEmpty());
+    }
+
+    @Test
+    void testRemoveNode() {
+        // Create a graph with some interconnected nodes
+        graph.addNode("A", null, "Person");
+        graph.addNode("B", null, "Person", "Employee");
+        graph.addNode("C", null, "Company");
+
+        // Add properties to a node
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("name", "Node B");
+        properties.put("age", 30);
+        graph.addNode("B", properties);
+
+        // Create edges between nodes
+        graph.addEdge("A", "B", "KNOWS");
+        graph.addEdge("B", "A", "WORKS_WITH");
+        graph.addEdge("B", "C", "WORKS_AT");
+        graph.addEdge("C", "B", "EMPLOYS");
+
+        // Now remove node B, which has both incoming and outgoing edges
+        assertTrue(graph.removeNode("B"));
+
+        // Verify node B is removed
+        assertFalse(graph.getNodes().contains("B"));
+        assertEquals(2, graph.getNodes().size());
+
+        // Verify B is removed from label indexes
+        assertTrue(graph.getNodesByLabel("Employee").isEmpty());
+        assertEquals(1, graph.getNodesByLabel("Person").size());
+        assertTrue(graph.getNodesByLabel("Person").contains("A"));
+
+        // Verify edges to/from B are removed
+        assertTrue(graph.getOutgoingEdges("A").isEmpty());
+        assertTrue(graph.getIncomingEdges("A").isEmpty());
+        assertTrue(graph.getOutgoingEdges("C").isEmpty());
+        assertTrue(graph.getIncomingEdges("C").isEmpty());
+
+        // Try to remove a non-existent node
+        assertFalse(graph.removeNode("Z"));
+
+        // Remove node with no connections
+        assertTrue(graph.removeNode("A"));
+        assertEquals(1, graph.getNodes().size());
+        assertTrue(graph.getNodesByLabel("Person").isEmpty());
+
+        // Remove last node
+        assertTrue(graph.removeNode("C"));
+        assertTrue(graph.getNodes().isEmpty());
+        assertTrue(graph.getNodesByLabel("Company").isEmpty());
+    }
+
+    @Test
+    void testRemoveEdge() {
+        // Create test graph structure
+        graph.addNode("A");
+        graph.addNode("B");
+
+        // Add multiple edges of different types
+        graph.addEdge("A", "B", "KNOWS");
+        graph.addEdge("A", "B", "WORKS_WITH");
+
+        // Remove one specific edge
+        assertTrue(graph.removeEdge("A", "B", "KNOWS"));
+
+        // Verify only the specific edge was removed
+        Map<String, Set<String>> outgoingEdges = graph.getOutgoingEdges("A");
+        assertTrue(outgoingEdges.containsKey("B"));
+        assertEquals(1, outgoingEdges.get("B").size());
+        assertTrue(outgoingEdges.get("B").contains("WORKS_WITH"));
+        assertFalse(outgoingEdges.get("B").contains("KNOWS"));
+
+        // Verify removing an edge that doesn't exist returns false
+        assertFalse(graph.removeEdge("A", "B", "FAMILY"));
+
+        // Verify removing from a non-existent node returns false
+        assertFalse(graph.removeEdge("Z", "B", "WORKS_WITH"));
+
+        // Verify removing to a non-existent node returns false
+        assertFalse(graph.removeEdge("A", "Z", "WORKS_WITH"));
+
+        // Remove the last edge
+        assertTrue(graph.removeEdge("A", "B", "WORKS_WITH"));
+
+        // Verify all edges are gone
+        assertTrue(graph.getOutgoingEdges("A").isEmpty());
+        assertTrue(graph.getIncomingEdges("B").isEmpty());
+    }
+
+    @Test
+    void testRemoveEdges() {
+        // Create test graph structure
+        graph.addNode("A");
+        graph.addNode("B");
+
+        // Add multiple edges of the same type
+        graph.addEdge("A", "B", "KNOWS");
+        graph.addEdge("A", "B", "KNOWS");  // This won't add a duplicate in our implementation
+
+        // Add edges of a different type
+        graph.addEdge("A", "B", "FRIEND");
+        graph.addEdge("A", "B", "COLLEAGUE");
+
+        // Remove all edges of type KNOWS
+        int removed = graph.removeEdges("A", "B", "KNOWS");
+        assertEquals(1, removed);
+
+        // Verify only KNOWS edges were removed
+        Map<String, Set<String>> outgoingEdges = graph.getOutgoingEdges("A");
+        assertEquals(1, outgoingEdges.size());
+        assertEquals(2, outgoingEdges.get("B").size());
+        assertFalse(outgoingEdges.get("B").contains("KNOWS"));
+        assertTrue(outgoingEdges.get("B").contains("FRIEND"));
+        assertTrue(outgoingEdges.get("B").contains("COLLEAGUE"));
+
+        // Remove with non-existent relationship type
+        removed = graph.removeEdges("A", "B", "NON_EXISTENT");
+        assertEquals(0, removed);
+
+        // Remove with non-existent source node
+        removed = graph.removeEdges("X", "B", "FRIEND");
+        assertEquals(0, removed);
+
+        // Remove with non-existent target node
+        removed = graph.removeEdges("A", "X", "FRIEND");
+        assertEquals(0, removed);
+
+        // Remove remaining edges
+        removed = graph.removeEdges("A", "B", "FRIEND");
+        assertEquals(1, removed);
+
+        removed = graph.removeEdges("A", "B", "COLLEAGUE");
+        assertEquals(1, removed);
+
+        // Verify all edges are gone
+        assertTrue(graph.getOutgoingEdges("A").isEmpty());
+        assertTrue(graph.getIncomingEdges("B").isEmpty());
+    }
+
+    @Test
+    void testRemoveNodeV2() {
+        // Create a graph with interconnected nodes
+        graph.addNode("A", null, "Person");
+        graph.addNode("B", null, "Person", "Employee");
+        graph.addNode("C", null, "Company");
+
+        // Add properties to nodes
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("name", "Node B");
+        properties.put("age", 30);
+        graph.addNode("B", properties);
+
+        // Create edges between nodes
+        graph.addEdge("A", "B", "KNOWS");
+        graph.addEdge("B", "A", "WORKS_WITH");
+        graph.addEdge("B", "C", "WORKS_AT");
+        graph.addEdge("C", "B", "EMPLOYS");
+
+        // Remove node B which has both incoming and outgoing edges
+        assertTrue(graph.removeNode("B"));
+
+        // Verify node B is removed
+        assertFalse(graph.getNodes().contains("B"));
+        assertEquals(2, graph.getNodes().size());
+
+        // Verify B is removed from label indexes
+        assertTrue(graph.getNodesByLabel("Employee").isEmpty());
+        assertEquals(1, graph.getNodesByLabel("Person").size());
+        assertTrue(graph.getNodesByLabel("Person").contains("A"));
+
+        // Verify edges connected to B are removed
+        assertTrue(graph.getOutgoingEdges("A").isEmpty());
+        assertTrue(graph.getIncomingEdges("A").isEmpty());
+        assertTrue(graph.getOutgoingEdges("C").isEmpty());
+        assertTrue(graph.getIncomingEdges("C").isEmpty());
+
+        // Try to remove non-existent node
+        assertFalse(graph.removeNode("Z"));
+
+        // Remove a node with no connections
+        assertTrue(graph.removeNode("A"));
+        assertEquals(1, graph.getNodes().size());
+        assertTrue(graph.getNodesByLabel("Person").isEmpty());
+
+        // Remove last node
+        assertTrue(graph.removeNode("C"));
+        assertTrue(graph.getNodes().isEmpty());
+        assertTrue(graph.getNodesByLabel("Company").isEmpty());
+    }
+
+    @Test
+    void testClear() {
+        // Create a non-empty graph with nodes, labels, edges and properties
+        graph.addNode("A", Map.of("key1", "value1"), "Person");
+        graph.addNode("B", Map.of("key2", "value2"), "Company");
+        graph.addNode("C", Map.of("key3", "value3"), "Person", "Employee");
+
+        graph.addEdge("A", "B", "KNOWS", Map.of("since", 2020));
+        graph.addEdge("B", "C", "EMPLOYS", Map.of("role", "Developer"));
+        graph.addEdge("C", "A", "WORKS_WITH");
+
+        // Verify graph is populated
+        assertEquals(3, graph.getNodes().size());
+        assertEquals(2, graph.getNodesByLabel("Person").size());
+        assertEquals(1, graph.getNodesByLabel("Company").size());
+        assertEquals(1, graph.getNodesByLabel("Employee").size());
+        assertFalse(graph.getOutgoingEdges("A").isEmpty());
+        assertFalse(graph.getOutgoingEdges("B").isEmpty());
+        assertFalse(graph.getOutgoingEdges("C").isEmpty());
+
+        // Clear the graph
+        graph.clear();
+
+        // Verify the graph is empty
+        assertTrue(graph.getNodes().isEmpty());
+        assertTrue(graph.getNodesByLabel("Person").isEmpty());
+        assertTrue(graph.getNodesByLabel("Company").isEmpty());
+        assertTrue(graph.getNodesByLabel("Employee").isEmpty());
+
+        // Verify outgoing edges are empty
+        assertTrue(graph.getOutgoingEdges("A").isEmpty());
+        assertTrue(graph.getOutgoingEdges("B").isEmpty());
+        assertTrue(graph.getOutgoingEdges("C").isEmpty());
+
+        // Verify incoming edges are empty
+        assertTrue(graph.getIncomingEdges("A").isEmpty());
+        assertTrue(graph.getIncomingEdges("B").isEmpty());
+        assertTrue(graph.getIncomingEdges("C").isEmpty());
+
+        // Verify we can repopulate the graph after clearing
+        graph.addNode("X", null, "NewLabel");
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(1, graph.getNodesByLabel("NewLabel").size());
+        assertTrue(graph.getNodes().contains("X"));
+    }
+
+    @Test
+    void testTraverseBreadthFirst() {
+        // Create a graph structure
+        //      A
+        //     / \
+        //    B   C
+        //   / \   \
+        //  D   E   F
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+        graph.addNode("E");
+        graph.addNode("F");
+
+        graph.addEdge("A", "B", "CONNECT");
+        graph.addEdge("A", "C", "CONNECT");
+        graph.addEdge("B", "D", "CONNECT");
+        graph.addEdge("B", "E", "CONNECT");
+        graph.addEdge("C", "F", "CONNECT");
+
+        // Collect visited nodes and depths in order
+        List<String> visitedNodes = new ArrayList<>();
+        List<Integer> visitedDepths = new ArrayList<>();
+
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            visitedNodes.add(node);
+            visitedDepths.add(depth);
+            return true;
+        });
+
+        // BFS should explore level by level
+        // Expected order: A -> B -> C -> D -> E -> F
+        assertEquals(6, visitedNodes.size());
+        assertEquals("A", visitedNodes.getFirst());
+        assertEquals(0, visitedDepths.getFirst());
+
+        // Verify A is visited first (depth 0)
+        assertEquals("A", visitedNodes.getFirst());
+        assertEquals(0, visitedDepths.getFirst());
+
+        // Verify B and C are visited next (both depth 1)
+        assertTrue(visitedNodes.indexOf("B") < visitedNodes.indexOf("D"));
+        assertTrue(visitedNodes.indexOf("B") < visitedNodes.indexOf("E"));
+        assertTrue(visitedNodes.indexOf("C") < visitedNodes.indexOf("F"));
+
+        // B and C should be at depth 1 (direct neighbors of A)
+        assertEquals(1, visitedDepths.get(visitedNodes.indexOf("B")));
+        assertEquals(1, visitedDepths.get(visitedNodes.indexOf("C")));
+
+        // D, E, and F should be at depth 2
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("D")));
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("E")));
+        assertEquals(2, visitedDepths.get(visitedNodes.indexOf("F")));
+
+        // Test early termination
+        List<String> earlyTerminationNodes = new ArrayList<>();
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            earlyTerminationNodes.add(node);
+            return !node.equals("C"); // Stop once we find C
+        });
+
+        // Should include A, B, and C (in some order, but A must-be first)
+        assertEquals(3, earlyTerminationNodes.size());
+        assertEquals("A", earlyTerminationNodes.getFirst());
+        assertTrue(earlyTerminationNodes.contains("B"));
+        assertTrue(earlyTerminationNodes.contains("C"));
+
+        // Test with a non-existent start node
+        List<String> nonExistentStart = new ArrayList<>();
+        graph.traverseBreadthFirst("Z", (node, depth) -> {
+            nonExistentStart.add(node);
+            return true;
+        });
+        assertTrue(nonExistentStart.isEmpty());
+    }
+
+    @Test
+    void testTraverseBreadthFirstWithCyclicGraph() {
+        // Create a graph with cycles
+        //      A ---→ B
+        //      ↑      ↓
+        //      └── C ←┘
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        graph.addEdge("A", "B", "CONNECT");
+        graph.addEdge("B", "C", "CONNECT");
+        graph.addEdge("C", "A", "CONNECT");
+
+        // Collect visited nodes
+        List<String> visitedNodes = new ArrayList<>();
+
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            visitedNodes.add(node);
+            return true;
+        });
+
+        // Verify all nodes are visited exactly once
+        assertEquals(3, visitedNodes.size());
+        assertEquals("A", visitedNodes.getFirst());
+        assertTrue(visitedNodes.contains("B"));
+        assertTrue(visitedNodes.contains("C"));
+
+        // Verify depth increases correctly even with cycles
+        List<Integer> depths = new ArrayList<>();
+        graph.traverseBreadthFirst("A", (node, depth) -> {
+            depths.add(depth);
+            return true;
+        });
+
+        assertEquals(0, depths.get(0)); // A at depth 0
+        assertEquals(1, depths.get(1)); // B at depth 1
+        assertEquals(2, depths.get(2)); // C at depth 2
+    }
+
+    @Test
+    void testAddNodeWithNullLabels() {
+        // Add a node with properties but null labels
+        Map<String, Object> properties = Map.of("key1", "value1", "key2", 42);
+
+        // Cast null to String[] to avoid the varargs ambiguity warning
+        boolean result = graph.addNode("A", properties, (String[]) null);
+
+        // Node should be added successfully
+        assertTrue(result);
+        assertTrue(graph.getNodes().contains("A"));
+
+        // Properties should be set correctly
+        Map<String, Object> nodeProperties = graph.getNodeProperties("A");
+        assertEquals(2, nodeProperties.size());
+        assertEquals("value1", nodeProperties.get("key1"));
+        assertEquals(42, nodeProperties.get("key2"));
+
+        // Verify no labels were added
+        Set<String> nodeLabels = graph.getNodesByLabel("SomeLabel");
+        assertTrue(nodeLabels.isEmpty());
+
+        // Add another node with the same ID but different properties and still null labels
+        Map<String, Object> newProperties = Map.of("key3", "value3");
+        boolean secondResult = graph.addNode("A", newProperties, (String[]) null);
+
+        // Node should not be added again (already exists)
+        assertFalse(secondResult);
+
+        // Properties should be updated
+        nodeProperties = graph.getNodeProperties("A");
+        assertEquals(3, nodeProperties.size());
+        assertEquals("value1", nodeProperties.get("key1"));
+        assertEquals(42, nodeProperties.get("key2"));
+        assertEquals("value3", nodeProperties.get("key3"));
+    }
+
+    @Test
+    void testGetEdgePropertiesWithNonMatchingTarget() {
+        // Set up a simple graph
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        // Add an edge from A to B with properties
+        Map<String, Object> edgeProps = Map.of("weight", 10, "type", "direct");
+        graph.addEdge("A", "B", "CONNECTS", edgeProps);
+
+        // Verify properties can be retrieved with the correct target
+        Map<String, Object> retrievedProps = graph.getEdgeProperties("A", "B", "CONNECTS");
+        assertEquals(2, retrievedProps.size());
+        assertEquals(10, retrievedProps.get("weight"));
+        assertEquals("direct", retrievedProps.get("type"));
+
+        // Test with a non-matching target (A->C instead of A->B)
+        Map<String, Object> nonMatchingTarget = graph.getEdgeProperties("A", "C", "CONNECTS");
+        assertTrue(nonMatchingTarget.isEmpty());
+
+        // Test with the correct target but wrong-edge type
+        Map<String, Object> wrongType = graph.getEdgeProperties("A", "B", "KNOWS");
+        assertTrue(wrongType.isEmpty());
+
+        // Test with non-existent source node
+        Map<String, Object> nonExistentSource = graph.getEdgeProperties("X", "B", "CONNECTS");
+        assertTrue(nonExistentSource.isEmpty());
+
+        // Add edge from A to C with different properties
+        Map<String, Object> otherEdgeProps = Map.of("strength", 5);
+        graph.addEdge("A", "C", "CONNECTS", otherEdgeProps);
+
+        // Verify we get the right properties for A->C
+        Map<String, Object> aToC = graph.getEdgeProperties("A", "C", "CONNECTS");
+        assertEquals(1, aToC.size());
+        assertEquals(5, aToC.get("strength"));
+
+        // Verify we still get the right properties for A->B
+        Map<String, Object> aToB = graph.getEdgeProperties("A", "B", "CONNECTS");
+        assertEquals(2, aToB.size());
+        assertEquals(10, aToB.get("weight"));
+    }
+
+    @Test
+    void testFindPathWithRelationshipTypesComprehensive() {
+        // Create a complex graph with multiple relationship types
+        //    A --friend--> B --colleague--> C
+        //    |             |                |
+        //    |             v                v
+        //    +--family---> D <--knows----- E
+        //    |             |                ^
+        //    v             v                |
+        //    F --knows---> G --partner----> H
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+        graph.addNode("D");
+        graph.addNode("E");
+        graph.addNode("F");
+        graph.addNode("G");
+        graph.addNode("H");
+
+        graph.addEdge("A", "B", "FRIEND");
+        graph.addEdge("B", "C", "COLLEAGUE");
+        graph.addEdge("A", "D", "FAMILY");
+        graph.addEdge("B", "D", "KNOWS");
+        graph.addEdge("C", "E", "COLLEAGUE");
+        graph.addEdge("E", "D", "KNOWS");
+        graph.addEdge("A", "F", "FAMILY");
+        graph.addEdge("F", "G", "KNOWS");
+        graph.addEdge("D", "G", "FRIEND");
+        graph.addEdge("G", "H", "PARTNER");
+        graph.addEdge("H", "E", "FAMILY");
+
+        // Test 1: Basic path with a specific relationship type
+        Optional<Iterable<String>> path1 = graph.findPath("A", "C", "FRIEND", "COLLEAGUE");
+        assertTrue(path1.isPresent());
+        assertEquals(Arrays.asList("A", "B", "C"), toList(path1.get()));
+
+        // Test 2: Different path with different relationship types
+        Optional<Iterable<String>> path2 = graph.findPath("A", "H", "FAMILY", "KNOWS", "FRIEND", "PARTNER");
+        assertTrue(path2.isPresent());
+        List<String> path2List = toList(path2.get());
+        assertTrue(
+                // Either A->D->G->H or A->F->G->H
+                (path2List.equals(Arrays.asList("A", "D", "G", "H")) ||
+                        path2List.equals(Arrays.asList("A", "F", "G", "H")))
+        );
+
+        // Test 3: No path with restricted relationship types
+        Optional<Iterable<String>> path3 = graph.findPath("A", "E", "FRIEND", "PARTNER");
+        assertFalse(path3.isPresent());
+
+        // Test 4: Path to self (trivial case)
+        Optional<Iterable<String>> path4 = graph.findPath("B", "B", "FRIEND");
+        assertTrue(path4.isPresent());
+        assertEquals(Collections.singletonList("B"), toList(path4.get()));
+
+        // Test 5: Non-existent start node
+        Optional<Iterable<String>> path5 = graph.findPath("Z", "A", "FRIEND");
+        assertFalse(path5.isPresent());
+
+        // Test 6: Non-existent end node
+        Optional<Iterable<String>> path6 = graph.findPath("A", "Z", "FRIEND");
+        assertFalse(path6.isPresent());
+
+        // Test 7: Empty relationship types array (should find no path)
+        Optional<Iterable<String>> path7 = graph.findPath("A", "C");
+        assertTrue(path7.isPresent()); // Should find some path
+
+        // Test 8: With empty allowed types set
+        Optional<Iterable<String>> path8 = graph.findPath("A", "C", new String[0]);
+        assertFalse(path8.isPresent()); // No allowed relationships mean no path
+
+        // Test 9: With null relationship types (should be treated as no restrictions)
+        Optional<Iterable<String>> path9 = graph.findPath("A", "H", (String[])null);
+        assertTrue(path9.isPresent());
+
+        // Test 10: Cyclic path with relationship constraints
+        graph.addEdge("E", "A", "SPECIAL");
+        Optional<Iterable<String>> path10 = graph.findPath("A", "A", "FAMILY", "KNOWS", "COLLEAGUE", "SPECIAL");
+        assertTrue(path10.isPresent());
+        List<String> cyclePath = toList(path10.get());
+        assertEquals("A", cyclePath.getFirst());
+        assertEquals("A", cyclePath.getLast());
+        assertTrue(cyclePath.size() > 1); // Not just self-reference
+
+        // Test 11: Multiple possible paths with the same relationship types
+        // path A->D->G and A->F->G both use "FAMILY" and "KNOWS"/"FRIEND"
+        Optional<Iterable<String>> path11 = graph.findPath("A", "G", "FAMILY", "KNOWS", "FRIEND");
+        assertTrue(path11.isPresent());
+        List<String> path11List = toList(path11.get());
+        assertTrue(
+                path11List.equals(Arrays.asList("A", "D", "G")) ||
+                        path11List.equals(Arrays.asList("A", "F", "G"))
+        );
+
+        // Test 12: Relationship types that don't exist in the graph
+        Optional<Iterable<String>> path12 = graph.findPath("A", "H", "NONEXISTENT_TYPE");
+        assertFalse(path12.isPresent());
+    }
 }

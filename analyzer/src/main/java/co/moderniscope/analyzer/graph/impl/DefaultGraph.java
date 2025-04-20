@@ -202,12 +202,12 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
                     queue.add(neighbor);
 
                     if (neighbor.equals(end)) {
-                        // Reconstruct path
+                        // Reconstruct a path
                         List<N> path = new ArrayList<>();
                         N step = end;
 
                         while (step != null) {
-                            path.add(0, step);
+                            path.addFirst(step);
                             step = predecessors.get(step);
                         }
 
@@ -222,16 +222,27 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
 
     @Override
     public Optional<Iterable<N>> findPath(N start, N end, String... relationshipTypes) {
-        // Similar to findPath but limiting to specific relationship types
+        // Check if nodes exist
         if (!nodes.containsKey(start) || !nodes.containsKey(end)) {
             return Optional.empty();
         }
 
-        if (start.equals(end)) {
+        // Handle special case for empty relationship types array
+        if (relationshipTypes != null && relationshipTypes.length == 0) {
+            return Optional.empty();
+        }
+
+        // For simple self-referencing path with no specific relationship types
+        if (start.equals(end) && relationshipTypes == null) {
             return Optional.of(Collections.singletonList(start));
         }
 
-        Set<String> allowedTypes = new HashSet<>(Arrays.asList(relationshipTypes));
+        // Create a set of allowed types
+        Set<String> allowedTypes = relationshipTypes == null ?
+                null :
+                new HashSet<>(Arrays.asList(relationshipTypes));
+
+        // Use BFS to find path
         Map<N, N> predecessors = new HashMap<>();
         Queue<N> queue = new LinkedList<>();
         Set<N> visited = new HashSet<>();
@@ -239,37 +250,65 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
         queue.add(start);
         visited.add(start);
 
+        // For cyclic paths when start equals end
+        boolean isCycleSearch = start.equals(end);
+        boolean foundCycle = false;
+
         while (!queue.isEmpty()) {
             N current = queue.poll();
             DefaultNode<N, DefaultEdge<N, E>> currentNode = nodes.get(current);
 
             for (DefaultEdge<N, E> edge : currentNode.getOutgoingEdges()) {
-                // Skip if not an allowed relationship type
-                if (!allowedTypes.contains(edge.getType().toString())) {
+                // Check relationship type filter
+                if (allowedTypes != null && !allowedTypes.contains(edge.getType().toString())) {
                     continue;
                 }
 
                 N neighbor = edge.getTarget();
 
-                if (!visited.contains(neighbor)) {
+                // Handle cycle detection - only if not coming directly from start
+                if (isCycleSearch && neighbor.equals(end) && !current.equals(start)) {
+                    predecessors.put(end, current);
+                    foundCycle = true;
+                    break;
+                }
+                // Handle normal path finding
+                else if (!visited.contains(neighbor)) {
                     predecessors.put(neighbor, current);
                     visited.add(neighbor);
                     queue.add(neighbor);
 
-                    if (neighbor.equals(end)) {
-                        // Reconstruct path
+                    if (neighbor.equals(end) && !isCycleSearch) {
+                        // Found path for normal case
                         List<N> path = new ArrayList<>();
                         N step = end;
-
                         while (step != null) {
                             path.add(0, step);
                             step = predecessors.get(step);
                         }
-
                         return Optional.of(path);
                     }
                 }
             }
+
+            if (foundCycle) {
+                break;
+            }
+        }
+
+        // Construct cycle path if found
+        if (isCycleSearch && foundCycle) {
+            List<N> cyclePath = new ArrayList<>();
+            cyclePath.add(end);  // Add the end node (which is also start)
+
+            N step = predecessors.get(end);
+            while (step != null && !step.equals(start)) {
+                cyclePath.add(0, step);
+                step = predecessors.get(step);
+            }
+
+            cyclePath.add(0, start);  // Add start node at beginning
+            return Optional.of(cyclePath);
         }
 
         return Optional.empty();
