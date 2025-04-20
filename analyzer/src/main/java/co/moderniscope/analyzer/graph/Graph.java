@@ -159,6 +159,39 @@ public interface Graph<N, E> {
     void traverseBreadthFirst(N start, NodeVisitor<N> visitor);
 
     /**
+     * Removes a node and all its connected edges from the graph.
+     *
+     * @param node The node to remove
+     * @return true if the node was removed, false if it didn't exist
+     */
+    boolean removeNode(N node);
+
+    /**
+     * Removes an edge between nodes.
+     *
+     * @param source Source node
+     * @param target Target node
+     * @param edge Edge information
+     * @return true if the edge was removed, false if it didn't exist
+     */
+    boolean removeEdge(N source, N target, E edge);
+
+    /**
+     * Removes all edges of a specific type between two nodes.
+     *
+     * @param source Source node
+     * @param target Target node
+     * @param relationshipType Type of relationship to remove
+     * @return Number of edges removed
+     */
+    int removeEdges(N source, N target, String relationshipType);
+
+    /**
+     * Clears the graph, removing all nodes and edges.
+     */
+    void clear();
+
+    /**
      * Functional interface for graph traversal.
      */
     interface NodeVisitor<N> {
