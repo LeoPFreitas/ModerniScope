@@ -236,26 +236,24 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
             return Optional.empty();
         }
 
-        // Verify all relationship types exist in the graph before proceeding
-        for (String type : relationshipTypes) {
-            boolean typeExists = false;
-            for (DefaultNode<N, DefaultEdge<N, E>> node : nodes.values()) {
-                for (DefaultEdge<N, E> edge : node.getOutgoingEdges()) {
-                    if (edge.getType().toString().equals(type)) {
-                        typeExists = true;
-                        break;
-                    }
-                }
-                if (typeExists) break;
-            }
-            if (!typeExists) {
-                return Optional.empty(); // If any type doesn't exist, no path is possible
-            }
-        }
-
         // Simple self-reference path - only valid if no traversal is needed
         if (start.equals(end) && nodes.get(start).getOutgoingEdges().isEmpty()) {
             return Optional.of(Collections.singletonList(start));
+        }
+
+        // Collect all relationship types in the graph in a single pass
+        Set<String> existingRelationshipTypes = new HashSet<>();
+        for (DefaultNode<N, DefaultEdge<N, E>> node : nodes.values()) {
+            for (DefaultEdge<N, E> edge : node.getOutgoingEdges()) {
+                existingRelationshipTypes.add(edge.getType().toString());
+            }
+        }
+
+        // Verify all requested relationship types exist
+        for (String type : relationshipTypes) {
+            if (!existingRelationshipTypes.contains(type)) {
+                return Optional.empty();
+            }
         }
 
         // Create a set of allowed relationship types
@@ -281,13 +279,11 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
 
                 N neighbor = edge.getTarget();
 
-                // For cycle detection when looking for a path back to the start
                 if (neighbor.equals(end)) {
                     // Reconstruct the path
                     List<N> path = new ArrayList<>();
-                    path.add(end); // Add end node
+                    path.add(end);
 
-                    // Only add predecessors if we're not directly connecting start to end
                     if (!current.equals(start)) {
                         N step = current;
                         while (step != null) {

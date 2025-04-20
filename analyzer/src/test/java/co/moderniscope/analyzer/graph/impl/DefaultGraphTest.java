@@ -1219,9 +1219,70 @@ class DefaultGraphTest {
         Optional<Iterable<String>> path11 = graph.findPath("A", "B", new String[0]);
         assertFalse(path11.isPresent());
 
-// Test 12: Null relationship types (checks for unrestricted path)
+        // Test 12: Null relationship types (checks for unrestricted path)
         Optional<Iterable<String>> path12 = graph.findPath("A", "G", (String[]) null);
         assertFalse(path12.isPresent()); // No directed path exists from A to G
+    }
+
+    @Test
+    void testFindPathNodeExistenceAndSpecialCases() {
+        // Create a simple graph
+        graph.addNode("A");
+        graph.addNode("B");
+        graph.addNode("C");
+
+        graph.addEdge("A", "B", "CONNECTS");
+        graph.addEdge("B", "C", "CONNECTS");
+
+        // Test 1: Non-existent start node
+        Optional<Iterable<String>> pathWithNonExistentStart = graph.findPath("X", "B", "CONNECTS");
+        assertFalse(pathWithNonExistentStart.isPresent());
+
+        // Test 2: Non-existent end node
+        Optional<Iterable<String>> pathWithNonExistentEnd = graph.findPath("A", "X", "CONNECTS");
+        assertFalse(pathWithNonExistentEnd.isPresent());
+
+        // Test 3: Null relationship types (should delegate to unrestricted path finding)
+        Optional<Iterable<String>> pathWithNullTypes = graph.findPath("A", "C", (String[]) null);
+        assertTrue(pathWithNullTypes.isPresent());
+        List<String> pathList = toList(pathWithNullTypes.get());
+        assertEquals(Arrays.asList("A", "B", "C"), pathList);
+
+        // Test 4: Empty relationship types array (no path possible)
+        Optional<Iterable<String>> pathWithEmptyTypes = graph.findPath("A", "C", new String[0]);
+        assertFalse(pathWithEmptyTypes.isPresent());
+    }
+
+    @Test
+    void testFindPathSelfReferenceWithNoOutgoingEdges() {
+        // Create an isolated node with no outgoing edges
+        graph.addNode("Isolated");
+
+        // Test finding path from the node to itself
+        Optional<Iterable<String>> selfPath = graph.findPath("Isolated", "Isolated", "SOME_TYPE");
+
+        // Verify path exists and contains only the node itself
+        assertTrue(selfPath.isPresent());
+        List<String> pathList = toList(selfPath.get());
+        assertEquals(1, pathList.size());
+        assertEquals("Isolated", pathList.get(0));
+
+        // Also test with multiple relationship types
+        Optional<Iterable<String>> selfPathMultiTypes =
+                graph.findPath("Isolated", "Isolated", "TYPE1", "TYPE2");
+        assertTrue(selfPathMultiTypes.isPresent());
+        assertEquals(1, toList(selfPathMultiTypes.get()).size());
+
+        // Contrasting case: node with outgoing edges should NOT match this condition
+        graph.addNode("WithEdge");
+        graph.addNode("Target");
+        graph.addEdge("WithEdge", "Target", "CONNECTS");
+
+        // For a node with outgoing edges, the method should continue to BFS
+        // and will likely still find a self-path but through normal path finding
+        Optional<Iterable<String>> selfPathWithEdges =
+                graph.findPath("WithEdge", "WithEdge", "CONNECTS");
+        assertTrue(selfPathWithEdges.isPresent());
     }
 
 }
