@@ -1265,7 +1265,7 @@ class DefaultGraphTest {
         assertTrue(selfPath.isPresent());
         List<String> pathList = toList(selfPath.get());
         assertEquals(1, pathList.size());
-        assertEquals("Isolated", pathList.get(0));
+        assertEquals("Isolated", pathList.getFirst());
 
         // Also test with multiple relationship types
         Optional<Iterable<String>> selfPathMultiTypes =

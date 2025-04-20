@@ -236,7 +236,8 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
             return Optional.empty();
         }
 
-        // Simple self-reference path - only valid if no traversal is needed
+        // Handle self-reference path ONLY if no relationship types were specified or we have no outgoing edges
+        // This allows cyclic paths through relationship types to be found
         if (start.equals(end) && nodes.get(start).getOutgoingEdges().isEmpty()) {
             return Optional.of(Collections.singletonList(start));
         }
@@ -256,10 +257,8 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
             }
         }
 
-        // Create a set of allowed relationship types
-        Set<String> allowedTypes = new HashSet<>(Arrays.asList(relationshipTypes));
-
         // BFS to find a path with relationship type filtering
+        Set<String> allowedTypes = new HashSet<>(Arrays.asList(relationshipTypes));
         Map<N, N> predecessors = new HashMap<>();
         Queue<N> queue = new LinkedList<>();
         Set<N> visited = new HashSet<>();
@@ -284,15 +283,12 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
                     List<N> path = new ArrayList<>();
                     path.add(end);
 
-                    if (!current.equals(start)) {
-                        N step = current;
-                        while (step != null) {
-                            path.addFirst(step);
-                            step = predecessors.get(step);
-                        }
-                    } else {
-                        path.addFirst(start);
+                    N predecessor = current;
+                    while (!predecessor.equals(start)) {
+                        path.addFirst(predecessor);
+                        predecessor = predecessors.get(predecessor);
                     }
+                    path.addFirst(start);
 
                     return Optional.of(path);
                 }
@@ -303,6 +299,12 @@ public class DefaultGraph<N, E> implements Graph<N, E> {
                     queue.add(neighbor);
                 }
             }
+        }
+
+        // For self-reference with specific relationship types, if we didn't find a path through
+        // relationships, still return the node itself as its own path
+        if (start.equals(end)) {
+            return Optional.of(Collections.singletonList(start));
         }
 
         return Optional.empty();
