@@ -5,7 +5,7 @@ javaparser = "3.26.4"
 neo4j = "5.28.4"
 slf4j = "2.0.17"
 picocli = "4.7.6"
-log4j = "2.20.0"
+log4j = "2.24.3"
 shadow = "8.1.1"
 
 [libraries]
