@@ -2,7 +2,7 @@
 junit = "5.12.2"
 junit-platform = "1.12.2"
 javaparser = "3.26.4"
-neo4j = "5.28.4"
+neo4j = "5.28.5"
 slf4j = "2.0.17"
 picocli = "4.7.7"
 log4j = "2.24.3"
